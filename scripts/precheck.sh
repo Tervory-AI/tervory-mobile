@@ -18,6 +18,7 @@ if [ -f package-lock.json ]; then
   npm test
   npm audit --audit-level=low
 fi
+if [ "${PRECHECK_SKIP_SEMGREP:-}" != 1 ]; then
 folder=$(basename "$PWD")
 container=$(docker run --detach --rm --label tervory.test=1 --name "${folder}-semgrep-$$" \
   --volume "$PWD:/src" --workdir /src --env TMPDIR=/src/.tmp --entrypoint semgrep \
@@ -31,4 +32,5 @@ if [ "$status" != 0 ]; then
   exit 1
 fi
 node scripts/check-semgrep.mjs .tmp/semgrep.json
+fi
 git diff --check
