@@ -22,5 +22,7 @@ folder=$(basename "$PWD")
 docker run --rm --label tervory.test=1 --name "${folder}-semgrep-$$" \
   --volume "$PWD:/src" --workdir /src --entrypoint semgrep \
   semgrep/semgrep:1.182.1@sha256:c8f333ab0ad103d2bcd3b55cbeabcfc556bfeaa7446ba18594a4320f3807ffc9 \
-  scan --config p/default --error --metrics=off --disable-version-check
+  scan --config p/default --json --metrics=off --disable-version-check \
+  --output /src/.tmp/semgrep.json
+node scripts/check-semgrep.mjs .tmp/semgrep.json
 git diff --check
