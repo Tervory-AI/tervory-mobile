@@ -75,12 +75,12 @@ public class TriggerSignInTest {
             assertTrue(device.wait(Until.hasObject(By.pkg("com.tervory.app")), 30000));
             awaitJavascript(activity, "location.pathname === '/chats' && document.body.innerText.includes('Your chats')");
             assertEquals("0", javascript(activity, "document.querySelectorAll('input[type=password]').length"));
-            javascript(activity, "fetch('/api/mobile/bootstrap').then(r => { window.bootstrapStatus = r.status; }); true");
+            javascript(activity, "fetch('/api/mobile/bootstrap').then(response => { window.bootstrapStatus = response.status; }); true");
             awaitJavascript(activity, "window.bootstrapStatus === 200");
             instrumentation.runOnMainSync(() -> ((com.capacitorjs.plugins.pushnotifications.PushNotificationsPlugin)
                 activity.getBridge().getPlugin("PushNotifications").getInstance()).sendToken("fake-emulator-phone"));
-            awaitJavascript(activity, "(fetch('/proof').then(r=>r.json()).then(p=>{window.registeredPhones=p.registered;}), window.registeredPhones >= 1)");
-            javascript(activity, "fetch('/notify', {method:'POST'}).then(r=>r.json()).then(n=>{window.fakeNotify=n;}); true");
+            awaitJavascript(activity, "(fetch('/proof').then(response=>response.json()).then(proof=>{window.registeredPhones=proof.registered;}), window.registeredPhones >= 1)");
+            javascript(activity, "fetch('/notify', {method:'POST'}).then(response=>response.json()).then(notification=>{window.fakeNotify=notification;}); true");
             awaitJavascript(activity, "Boolean(window.fakeNotify)");
             String serialized = javascript(activity, "JSON.stringify(window.fakeNotify)");
             String data = new org.json.JSONArray("[" + serialized + "]").getString(0);
@@ -91,7 +91,7 @@ public class TriggerSignInTest {
                 .putExtra("path", notification.getString("path"));
             instrumentation.getTargetContext().startActivity(tap);
             awaitJavascript(activity, "location.pathname === '/chats' && location.search === '?notification=proof'");
-            javascript(activity, "fetch('/proof').then(r=>r.json()).then(p=>{window.signInProof=p;}); true");
+            javascript(activity, "fetch('/proof').then(response=>response.json()).then(proof=>{window.signInProof=proof;}); true");
             awaitJavascript(activity, "window.signInProof && window.signInProof.browserSignIn === 1 && window.signInProof.approved === 1 && window.signInProof.exchanged === 1 && window.signInProof.authenticatedChats >= 1 && window.signInProof.notified === 1");
         } finally {
             device.takeScreenshot(new File(activity.getExternalFilesDir(null), "trigger-sign-in.png"));
