@@ -28,6 +28,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         SceneDelegateProxy.shared.scene(scene, continue: userActivity)
         if let url = userActivity.webpageURL { MobileShell.shared?.receiveLink(url) }
     }
+
+    func sceneDidBecomeActive(_ scene: UIScene) {
+        MobileShell.shared?.resumeShare()
+    }
 }
 
 class MobileViewController: CAPBridgeViewController {
@@ -46,6 +50,7 @@ class MobileShell: CAPPlugin, CAPBridgedPlugin {
     let identifier = "MobileShell"
     let jsName = "MobileShell"
     let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "beginSignIn", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "pending", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "acknowledge", returnType: CAPPluginReturnPromise)
     ]
@@ -111,6 +116,7 @@ class MobileShell: CAPPlugin, CAPBridgedPlugin {
     }
 
     func receiveLink(_ url: URL) {
+        if trusted(url), url.path == "/mobile/share" { resumeShare(); return }
         guard trusted(url), url.path == "/mobile/callback", url.fragment == nil,
               let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems,
               items.filter({ $0.name == "state" }).count == 1,
@@ -132,12 +138,48 @@ class MobileShell: CAPPlugin, CAPBridgedPlugin {
         guard trusted(webView?.url) else { call.reject("Untrusted page"); return }
         var result: [String: Any] = [:]
         if let auth { result["auth"] = auth }
+        if let share = pendingShare() { result["share"] = share }
         call.resolve(result)
+    }
+
+    @objc func beginSignIn(_ call: CAPPluginCall) {
+        guard trusted(webView?.url) else { call.reject("Untrusted page"); return }
+        DispatchQueue.main.async { self.signIn() }
+        call.resolve()
     }
 
     @objc func acknowledge(_ call: CAPPluginCall) {
         guard trusted(webView?.url) else { call.reject("Untrusted page"); return }
         if call.getString("kind") == "auth" { auth = nil }
+        if call.getString("kind") == "share", let id = call.getString("id"),
+           let share = pendingShare(), share["id"] as? String == id, let url = shareURL() {
+            try? FileManager.default.removeItem(at: url)
+        }
         call.resolve()
+    }
+
+    private func shareURL() -> URL? {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.tervory.app")?
+            .appendingPathComponent("share-inbox.json")
+    }
+
+    private func pendingShare() -> [String: Any]? {
+        guard let url = shareURL(), let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = attributes[.size] as? NSNumber, size.intValue <= 15 * 1024 * 1024,
+              let data = try? Data(contentsOf: url),
+              let share = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let created = share["created"] as? Double else { return nil }
+        guard Date().timeIntervalSince1970 - created < 86400 else {
+            try? FileManager.default.removeItem(at: url)
+            return nil
+        }
+        return share
+    }
+
+    func resumeShare() {
+        guard pendingShare() != nil else { return }
+        DispatchQueue.main.async {
+            self.webView?.load(URLRequest(url: URL(string: self.origin + "/chats")!))
+        }
     }
 }

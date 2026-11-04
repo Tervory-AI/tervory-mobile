@@ -52,5 +52,17 @@ public class MainActivity extends BridgeActivity {
         if (intent != null && Intent.ACTION_VIEW.equals(intent.getAction())) {
             ((MobileShell) bridge.getPlugin("MobileShell").getInstance()).receiveLink(intent.getData());
         }
+        if (intent != null && (Intent.ACTION_SEND.equals(intent.getAction()) || Intent.ACTION_SEND_MULTIPLE.equals(intent.getAction()))) {
+            new Thread(() -> {
+                try {
+                    ShareInbox.receive(this, intent);
+                    runOnUiThread(() -> bridge.getWebView().loadUrl(MobileShell.ORIGIN + "/chats"));
+                } catch (Exception error) {
+                    runOnUiThread(() -> new android.app.AlertDialog.Builder(this)
+                        .setMessage("Share up to five files totaling 10 MB. Please try sharing again.")
+                        .setPositiveButton("OK", null).show());
+                }
+            }, "tervory-share").start();
+        }
     }
 }

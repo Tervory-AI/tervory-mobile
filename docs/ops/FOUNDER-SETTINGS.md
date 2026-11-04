@@ -21,3 +21,20 @@ or the existing Workspace deployment settings; never commit signing files.
 No store submission or signing is automatic. The shared identifier is
 `com.tervory.app`. Configure the paid accounts before a physical-device universal
 link or App Store push test. See ../INTEGRATION.md for the server prerequisites.
+
+## Push and sharing
+
+- `MOBILE_FIREBASE_GOOGLE_SERVICES_JSON`: repository secret holding the Android
+  Firebase client configuration for `com.tervory.app`; injected only into native
+  builds. Without it, builds remain unsigned and push registration stays off.
+- `MOBILE_FCM_PROJECT_ID`, `MOBILE_FCM_SERVICE_ACCOUNT_JSON`: existing-server
+  delivery configuration for FCM HTTP v1; never included in the app or CI artifacts.
+- `MOBILE_APNS_KEY_ID`, `MOBILE_APNS_TEAM_ID`, `MOBILE_APNS_PRIVATE_KEY`,
+  `MOBILE_APNS_ENVIRONMENT`: existing-server APNs delivery credentials and
+  sandbox/production selection; never included in the app.
+- `MOBILE_APP_GROUP_ID`: register the fixed value `group.com.tervory.app` for
+  both Apple App IDs; the checked-in entitlements already reference it.
+
+The mobile push plugin does not add a new paid service. APNs requires the Apple
+membership above; FCM uses its free messaging service. Enable bootstrap push only
+after the server owner wires existing alerts and sign-out token unlinking.

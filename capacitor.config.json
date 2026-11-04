@@ -6,5 +6,10 @@
     "url": "https://app.tervory.com",
     "cleartext": false
   },
-  "backgroundColor": "#001840"
+  "backgroundColor": "#001840",
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  }
 }

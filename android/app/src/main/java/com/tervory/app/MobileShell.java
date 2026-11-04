@@ -86,6 +86,19 @@ public class MobileShell extends Plugin {
     }
 
     @PluginMethod
+    public void beginSignIn(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            String current = getBridge().getWebView().getUrl();
+            if (current == null || !isWorkspace(Uri.parse(current))) {
+                call.reject("Untrusted page");
+                return;
+            }
+            signIn();
+            call.resolve();
+        });
+    }
+
+    @PluginMethod
     public void pending(PluginCall call) {
         getActivity().runOnUiThread(() -> {
             String current = getBridge().getWebView().getUrl();
@@ -95,6 +108,8 @@ public class MobileShell extends Plugin {
             }
             JSObject result = new JSObject();
             if (auth != null) result.put("auth", auth);
+            JSObject share = ShareInbox.pending(getContext());
+            if (share != null) result.put("share", share);
             call.resolve(result);
         });
     }
@@ -108,6 +123,7 @@ public class MobileShell extends Plugin {
                 return;
             }
             if ("auth".equals(call.getString("kind"))) auth = null;
+            if ("share".equals(call.getString("kind"))) ShareInbox.acknowledge(getContext(), call.getString("id"));
             call.resolve();
         });
     }

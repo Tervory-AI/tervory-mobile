@@ -586,19 +586,116 @@
     web: () => Promise.resolve().then(() => (init_web(), web_exports)).then((m) => new m.AppWeb())
   });
 
+  // node_modules/@capacitor/push-notifications/dist/esm/index.js
+  init_dist();
+  var PushNotifications = registerPlugin("PushNotifications", {});
+
   // src/policy.mjs
   var ORIGIN = "https://app.tervory.com";
   var CALLBACK = `${ORIGIN}/mobile/callback`;
+  function trustedURL(value) {
+    try {
+      const url = new URL(value);
+      return url.origin === ORIGIN && !url.username && !url.password ? url : null;
+    } catch {
+      return null;
+    }
+  }
   function sessionBody(code, verifier) {
     if (typeof code !== "string" || !/^[A-Za-z0-9_-]{16,512}$/.test(code) || typeof verifier !== "string" || !/^[A-Za-z0-9_-]{43,128}$/.test(verifier)) {
       throw new Error("Trigger sign-in could not be verified. Please try again.");
     }
     return { code, code_verifier: verifier, redirect_uri: CALLBACK };
   }
+  function notificationPath(value) {
+    let url;
+    try {
+      url = trustedURL(new URL(typeof value === "string" ? value : "/chats", ORIGIN).href);
+    } catch {
+      return "/chats";
+    }
+    return url && (url.pathname === "/chats" || url.pathname.startsWith("/chats/")) ? `${url.pathname}${url.search}` : "/chats";
+  }
+
+  // src/share.mjs
+  var MAX_SHARE_BYTES = 10 * 1024 * 1024;
+  function shareForm(share) {
+    if (!share || typeof share.id !== "string" || !/^[A-Za-z0-9-]{1,80}$/.test(share.id)) {
+      throw new Error("The shared item could not be read. Please share it again.");
+    }
+    const form = new FormData();
+    form.append("share_id", share.id);
+    const text = typeof share.text === "string" ? share.text : "";
+    let size = new TextEncoder().encode(text).length;
+    if (size > MAX_SHARE_BYTES) throw new Error("Share files up to 10 MB at a time.");
+    form.append("text", text);
+    const files = share.files ?? [];
+    if (!Array.isArray(files) || files.length > 5) throw new Error("Share up to five files at a time.");
+    for (const file of files) {
+      if (typeof file.data !== "string" || file.data.length > Math.ceil(MAX_SHARE_BYTES / 3) * 4) {
+        throw new Error("Share files up to 10 MB at a time.");
+      }
+      const binary = atob(file.data);
+      size += binary.length;
+      if (size > MAX_SHARE_BYTES) throw new Error("Share files up to 10 MB at a time.");
+      const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+      const name = typeof file.name === "string" ? Array.from(
+        file.name,
+        (character) => character.charCodeAt(0) < 32 || "/\\".includes(character) ? "_" : character
+      ).join("").slice(0, 180) : "shared-file";
+      form.append("files", new Blob([bytes], { type: "application/octet-stream" }), name || "shared-file");
+    }
+    if (!text && files.length === 0) throw new Error("Nothing was shared.");
+    return form;
+  }
 
   // src/native.mjs
   var shell = registerPlugin("MobileShell");
   var running = false;
+  var pushReady = false;
+  var pushListening = false;
+  function guardSignIn() {
+    if (document.getElementById("tervory-trigger-sign-in")) return;
+    if (!location.pathname.startsWith("/sign-in") && !document.querySelector('input[type="password"]')) return;
+    const title = document.createElement("h1");
+    title.textContent = "Trigger sign-in";
+    const button = document.createElement("button");
+    button.id = "tervory-trigger-sign-in";
+    button.textContent = "Continue in browser";
+    button.onclick = () => void shell.beginSignIn();
+    document.body.replaceChildren(title, button);
+  }
+  async function notifications() {
+    if (pushReady) return;
+    const bootstrap = await fetch("/api/mobile/bootstrap", { credentials: "same-origin", redirect: "error" });
+    if (!bootstrap.ok || !(await bootstrap.json()).push_enabled) return;
+    pushReady = true;
+    if (!pushListening) {
+      pushListening = true;
+      await PushNotifications.addListener("registration", ({ value }) => {
+        void fetch("/api/mobile/devices", {
+          method: "POST",
+          credentials: "same-origin",
+          redirect: "error",
+          headers: { "Content-Type": "application/json", "X-Tervory-Mobile": "1" },
+          body: JSON.stringify({ token: value, platform: window.Capacitor.getPlatform() })
+        }).then((response) => {
+          if (!response.ok) pushReady = false;
+        }).catch(() => {
+          pushReady = false;
+        });
+      });
+      await PushNotifications.addListener("registrationError", () => {
+        pushReady = false;
+      });
+      await PushNotifications.addListener("pushNotificationActionPerformed", ({ notification }) => {
+        location.assign(notificationPath(notification.data?.path));
+      });
+    }
+    let permission = await PushNotifications.checkPermissions();
+    if (permission.receive === "prompt") permission = await PushNotifications.requestPermissions();
+    if (permission.receive === "granted") await PushNotifications.register();
+  }
   async function resume() {
     if (running || location.origin !== ORIGIN) return;
     running = true;
@@ -615,7 +712,27 @@
         if (!response.ok) throw new Error("Trigger sign-in is unavailable. Please try again.");
         await shell.acknowledge({ kind: "auth" });
         location.replace("/chats");
+        return;
       }
+      if (pending.share) {
+        const response = await fetch("/api/mobile/shares", {
+          method: "POST",
+          credentials: "same-origin",
+          redirect: "error",
+          headers: { "X-Tervory-Mobile": "1" },
+          body: shareForm(pending.share)
+        });
+        if (response.status === 401) return;
+        if (!response.ok) throw new Error("Your shared item is saved on this device. Please try again later.");
+        const result = await response.json();
+        if (typeof result.draft_id !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(result.draft_id)) {
+          throw new Error("The shared item could not be opened. Please try again.");
+        }
+        await shell.acknowledge({ kind: "share", id: pending.share.id });
+        location.replace(`/chats?draft=${encodeURIComponent(result.draft_id)}`);
+        return;
+      }
+      await notifications();
     } catch (error) {
       const message = document.createElement("p");
       message.setAttribute("role", "alert");
@@ -625,7 +742,10 @@
       running = false;
     }
   }
-  if (location.origin === ORIGIN) {
+  if (location.origin === ORIGIN && !window.__tervoryNativeStarted) {
+    window.__tervoryNativeStarted = true;
+    new MutationObserver(guardSignIn).observe(document.body, { childList: true, subtree: true });
+    guardSignIn();
     App.addListener("appStateChange", ({ isActive }) => {
       if (isActive) void resume();
     });

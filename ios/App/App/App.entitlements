@@ -4,4 +4,6 @@
   <key>com.apple.developer.associated-domains</key>
   <array><string>applinks:app.tervory.com</string></array>
   <key>aps-environment</key><string>$(APS_ENVIRONMENT)</string>
+  <key>com.apple.security.application-groups</key>
+  <array><string>group.com.tervory.app</string></array>
 </dict></plist>

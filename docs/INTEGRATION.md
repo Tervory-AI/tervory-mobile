@@ -51,3 +51,48 @@ The release is not complete until CI builds both platforms and an Android
 emulator authenticates through Trigger in its browser, follows the verified
 callback, and opens the authenticated `/chats` page. A URL-routing or mock-server
 test alone is not sign-in acceptance. Record the build URL and emulator evidence.
+
+## Push delivery (Workspace/Tank owner)
+
+These endpoints also require implementation; the mobile repository cannot wire
+the existing product delivery workers by itself.
+
+- Authenticated GET `/api/mobile/bootstrap` returns `{ "push_enabled": true }`
+  only once native delivery is configured for that user. Otherwise return false.
+- Authenticated POST `/api/mobile/devices` accepts `{token, platform}` where
+  platform is `ios` (APNs) or `android` (FCM). Derive user and tenant from the
+  existing session; reject client tenant IDs and cross-origin requests. Upsert
+  and rotate registrations without duplicating deliveries. Unlink registrations
+  on sign-out, session revocation and account/tenant removal. Tokens are personal
+  data; never log them. Only permit one active user/tenant binding per token.
+- Fan out the alerts already emitted by Tiger, Radix, Autumbra, Market Lab and
+  the morning report through APNs/FCM alongside existing delivery. Reuse the
+  existing event IDs for deduplication, user preferences and authorization.
+  Delete invalid/revoked tokens, retry transient failures with a bound, and do
+  not include private alert bodies in lock-screen text by default.
+- Send notification payloads, not data-only background messages. Use generic
+  title/body and optional `data.path` restricted to `/chats` or its descendants.
+  Native notification taps always return to chats; payloads cannot open external
+  sites. APNs and FCM credentials stay on the server.
+
+## Share drafts (Workspace owner)
+
+Authenticated multipart POST `/api/mobile/shares` receives `share_id`, `text`,
+and up to five binary `files` with a combined 10 MiB limit. Verify Origin and
+session, derive the tenant, sanitize filenames, validate file sizes/types on the
+server, scan/quarantine attachments, and store an **unsent chat draft**. Never
+execute shared content, automatically fetch a URL or send a message. Deduplicate
+`share_id` per user/tenant so retries return the same `{ "draft_id": "…" }`.
+The existing `/chats?draft=…` UI must load only that user's tenant-scoped draft
+and let the user review it before sending. Return 401 while signed out.
+
+Android SEND/SEND_MULTIPLE opens `/chats` immediately. iOS uses a Share extension
+and a protected App Group inbox; the next containing-app activation opens chats.
+The user sees “Saved. Open Tervory to continue in chats.” Apple does not support
+launching the containing app from its Share extension via NSExtensionContext.open:
+https://developer.apple.com/documentation/foundation/nsextensioncontext/open(_:completionhandler:)
+Immediate app launch from an iOS share sheet is therefore not claimed here.
+Both platforms retain the last pending share locally for at most 24 hours and
+delete it after successful draft creation. Unsigned iOS builds cannot exercise
+App Group sharing on a physical device. Signing must enable the App Group for
+both `com.tervory.app` and `com.tervory.app.share`.
