@@ -79,6 +79,12 @@ test('signed-out sharing retains the native inbox without sending a message', as
   assert.deepEqual(result.destinations, []);
 });
 
+test('unsigned Android builds without Firebase client settings do not register live push', async () => {
+  const result = await run({ push_available: false });
+  assert.deepEqual(result.calls, []);
+  assert.deepEqual(result.errors, []);
+});
+
 test('a successful shared draft is acknowledged before opening its chats preview', async () => {
   const result = await run({ share: { id: 'share-1', text: 'https://example.org' } }, 201);
   assert.equal(result.calls[1].acknowledge.kind, 'share');

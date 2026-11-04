@@ -81,7 +81,7 @@ async function resume() {
       location.replace(`/chats?draft=${encodeURIComponent(result.draft_id)}`);
       return;
     }
-    await notifications();
+    if (pending.push_available !== false) await notifications();
   } catch (error) {
     const message = document.createElement('p');
     message.setAttribute('role', 'alert');

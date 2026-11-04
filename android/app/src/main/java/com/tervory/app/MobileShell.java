@@ -115,6 +115,8 @@ public class MobileShell extends Plugin {
                 return;
             }
             JSObject result = new JSObject();
+            result.put("push_available", BuildConfig.MOBILE_E2E || getContext().getResources()
+                .getIdentifier("google_app_id", "string", getContext().getPackageName()) != 0);
             if (auth != null) result.put("auth", auth);
             JSObject share = ShareInbox.pending(getContext());
             if (share != null) result.put("share", share);
