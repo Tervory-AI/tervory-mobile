@@ -44,13 +44,17 @@ async function notifications() {
   let permission = await PushNotifications.checkPermissions();
   if (permission.receive === 'prompt') permission = await PushNotifications.requestPermissions();
   if (permission.receive === 'granted') await PushNotifications.register();
+  else pushReady = false;
 }
 
 async function resume() {
   if (running || location.origin !== ORIGIN) return;
+  if (location.pathname === '/sign-in' || location.pathname.startsWith('/sign-in/')) return;
   running = true;
+  let signInFailed = false;
   try {
     const pending = await shell.pending();
+    signInFailed = Boolean(pending.auth);
     if (pending.auth) {
       const response = await fetch('/api/mobile/session', {
         method: 'POST', credentials: 'same-origin', redirect: 'error',
@@ -83,6 +87,12 @@ async function resume() {
     message.setAttribute('role', 'alert');
     message.textContent = error.message;
     document.body.prepend(message);
+    if (signInFailed) {
+      const retry = document.createElement('button');
+      retry.textContent = 'Trigger sign-in';
+      retry.onclick = () => void shell.beginSignIn();
+      document.body.prepend(retry);
+    }
   } finally {
     running = false;
   }

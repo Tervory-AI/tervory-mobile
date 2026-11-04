@@ -69,6 +69,7 @@ the existing product delivery workers by itself.
 
 - Authenticated GET `/api/mobile/bootstrap` returns `{ "push_enabled": true }`
   only once native delivery is configured for that user. Otherwise return false.
+  Signed-out requests return 401 rather than redirecting to an identity page.
 - Authenticated POST `/api/mobile/devices` accepts `{token, platform}` where
   platform is `ios` (APNs) or `android` (FCM). Derive user and tenant from the
   existing session; reject client tenant IDs and cross-origin requests. Upsert

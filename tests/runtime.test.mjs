@@ -69,6 +69,7 @@ test('a refused session does not consume the proof or claim authenticated chats'
   assert.equal(result.calls.length, 1);
   assert.deepEqual(result.destinations, []);
   assert.match(result.errors[0], /Trigger sign-in is unavailable/);
+  assert.equal(result.errors[1], 'Trigger sign-in');
 });
 
 test('signed-out sharing retains the native inbox without sending a message', async () => {

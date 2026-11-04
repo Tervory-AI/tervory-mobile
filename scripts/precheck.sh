@@ -20,9 +20,9 @@ if [ -f package-lock.json ]; then
 fi
 folder=$(basename "$PWD")
 container=$(docker run --detach --rm --label tervory.test=1 --name "${folder}-semgrep-$$" \
-  --volume "$PWD:/src" --workdir /src --entrypoint semgrep \
+  --volume "$PWD:/src" --workdir /src --env TMPDIR=/src/.tmp --entrypoint semgrep \
   semgrep/semgrep:1.182.1@sha256:c8f333ab0ad103d2bcd3b55cbeabcfc556bfeaa7446ba18594a4320f3807ffc9 \
-  scan --config p/default --json --metrics=off --disable-version-check --timeout 120 \
+  scan --config p/default --json --metrics=off --disable-version-check --timeout 120 --timeout-threshold 0 --jobs 2 \
   --output /src/.tmp/semgrep.json)
 status=$(docker wait "$container")
 if [ "$status" != 0 ]; then
