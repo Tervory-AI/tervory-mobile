@@ -18,10 +18,14 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         if let url = connectionOptions.userActivities.first?.webpageURL {
             MobileShell.shared?.receiveLink(url)
         }
+        if let url = connectionOptions.urlContexts.first?.url {
+            MobileShell.shared?.receiveShare(url)
+        }
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
         SceneDelegateProxy.shared.scene(scene, openURLContexts: URLContexts)
+        if let url = URLContexts.first?.url { MobileShell.shared?.receiveShare(url) }
     }
 
     func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
@@ -202,5 +206,14 @@ class MobileShell: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.async {
             self.webView?.load(URLRequest(url: URL(string: self.origin + "/chats")!))
         }
+    }
+
+    func receiveShare(_ url: URL) {
+        guard url.scheme == "tervory", url.host == "share", url.user == nil, url.password == nil,
+              url.query == nil, url.fragment == nil, url.port == nil,
+              let identifier = UUID(uuidString: String(url.path.dropFirst())),
+              let pending = pendingShare(), let stored = pending["id"] as? String,
+              UUID(uuidString: stored) == identifier else { return }
+        resumeShare()
     }
 }

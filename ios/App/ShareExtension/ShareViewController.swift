@@ -2,12 +2,13 @@ import UIKit
 import UniformTypeIdentifiers
 
 class ShareViewController: UIViewController {
-    private let limit = 10 * 1024 * 1024
+    private let limit = 5 * 1024 * 1024
     private var used = 0
     private var text = ""
     private var files: [[String: String]] = []
     private let message = UILabel()
     private let done = UIButton(type: .system)
+    private var handoff: URL?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -82,22 +83,40 @@ class ShareViewController: UIViewController {
             fail(); return
         }
         do {
-            let payload: [String: Any] = ["id": UUID().uuidString, "text": text,
+            let identifier = UUID().uuidString
+            let payload: [String: Any] = ["id": identifier, "text": text,
                 "files": files, "created": Date().timeIntervalSince1970]
             var url = directory.appendingPathComponent("share-inbox.json")
             try JSONSerialization.data(withJSONObject: payload).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
             var values = URLResourceValues()
             values.isExcludedFromBackup = true
             try url.setResourceValues(values)
-            message.text = "Saved. Open Tervory to continue in chats."
+            handoff = URL(string: "tervory://share/" + identifier)
+            openChats()
         } catch { fail() }
     }
 
+    private func openChats() {
+        guard let handoff, let scene = view.window?.windowScene else {
+            message.text = "Your item is saved. Tap Open chats to continue."
+            done.setTitle("Open chats", for: .normal)
+            return
+        }
+        scene.open(handoff, options: nil) { opened in
+            if opened { self.extensionContext?.completeRequest(returningItems: nil) }
+            else {
+                self.message.text = "Tervory could not open. Your shared item is saved. Try again."
+                self.done.setTitle("Open chats", for: .normal)
+            }
+        }
+    }
+
     private func fail() {
-        message.text = "This item could not be saved. Share up to five files totaling 10 MB, then try again."
+        message.text = "This item could not be saved. Share up to five files totaling 5 MB, then try again."
     }
 
     @objc private func finish() {
-        extensionContext?.completeRequest(returningItems: nil)
+        if handoff != nil { openChats() }
+        else { extensionContext?.completeRequest(returningItems: nil) }
     }
 }
