@@ -16,6 +16,7 @@ import java.io.File;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
 import org.json.JSONObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -54,11 +55,11 @@ public class TriggerSignInTest {
         Intent launch = new Intent(instrumentation.getTargetContext(), MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         MainActivity activity = (MainActivity) instrumentation.startActivitySync(launch);
         try {
-            UiObject2 proceed = device.wait(Until.findObject(By.textMatches("Continue|Continue in browser")), 30000);
+            UiObject2 proceed = device.wait(Until.findObject(By.text(Pattern.compile("(?i)Continue|Continue in browser"))), 30000);
             assertNotNull("Native Trigger sign-in prompt", proceed);
             if ("Continue in browser".equals(proceed.getText())) {
                 proceed.click();
-                proceed = device.wait(Until.findObject(By.text("Continue")), 10000);
+                proceed = device.wait(Until.findObject(By.res("android", "button1")), 10000);
                 assertNotNull("Native system-browser confirmation", proceed);
             }
             proceed.click();
