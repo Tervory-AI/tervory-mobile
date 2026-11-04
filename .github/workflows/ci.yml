@@ -1,0 +1,152 @@
+name: mobile
+
+on:
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+  push:
+    tags: ['mobile-v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  TMPDIR: ${{ github.workspace }}/.tmp
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: mkdir -p "$TMPDIR"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Gitleaks, lint, tests, dependency audit and Semgrep
+        run: bash scripts/precheck.sh
+      - name: Check generated bridge and brand assets
+        run: |
+          npm run assets
+          npm run sync
+          git diff --exit-code
+      - name: Check mobile tag version
+        if: startsWith(github.ref, 'refs/tags/mobile-v')
+        env:
+          MOBILE_TAG: ${{ github.ref_name }}
+        run: node scripts/check-tag.mjs
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: security-report
+          path: .tmp/semgrep.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  android:
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: mkdir -p "$TMPDIR"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci && npm run sync
+      - run: node scripts/build-e2e.mjs
+      - name: Optional Firebase client configuration
+        env:
+          MOBILE_FIREBASE_GOOGLE_SERVICES_JSON: ${{ secrets.MOBILE_FIREBASE_GOOGLE_SERVICES_JSON }}
+        run: node scripts/firebase-config.mjs
+      - name: Install SDK
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;35.0.0" "platform-tools"'
+      - name: Build unsigned bundle and emulator APKs
+        working-directory: android
+        run: ./gradlew --no-daemon :app:lintDebug :app:bundleRelease :app:assembleDebug :app:assembleE2e :app:assembleE2eAndroidTest
+      - name: Enable KVM for the runner user
+        run: sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+      - name: Emulator Trigger sign-in, notification, link and share tests
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: bash scripts/android-e2e.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: success()
+        with:
+          name: tervory-android-unsigned-${{ github.sha }}
+          path: android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: android-test-results
+          path: |
+            android/app/build/reports/
+            android/app/build/outputs/androidTest-results/
+            .tmp/emulator/
+          if-no-files-found: ignore
+          retention-days: 14
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: success()
+        with:
+          name: tervory-android-emulator-debug-${{ github.sha }}
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  ios:
+    needs: checks
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: mkdir -p "$TMPDIR"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci && npm run sync
+      - name: Select Xcode 26
+        run: |
+          xcode=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' | sort | tail -1)
+          test -n "$xcode"
+          sudo xcode-select --switch "$xcode/Contents/Developer"
+          xcodebuild -version
+      - name: Build unsigned iOS archive including Share extension
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -archivePath "$TMPDIR/Tervory.xcarchive" \
+            -derivedDataPath "$TMPDIR/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' archive
+          mkdir -p artifacts
+          ditto -c -k --sequesterRsrc --keepParent "$TMPDIR/Tervory.xcarchive" artifacts/Tervory-unsigned.xcarchive.zip
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: tervory-ios-unsigned-${{ github.sha }}
+          path: artifacts/Tervory-unsigned.xcarchive.zip
+          if-no-files-found: error
+          retention-days: 30

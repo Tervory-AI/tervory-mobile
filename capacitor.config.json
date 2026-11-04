@@ -1,0 +1,16 @@
+{
+  "appId": "com.tervory.app",
+  "appName": "Tervory",
+  "webDir": "www",
+  "loggingBehavior": "none",
+  "server": {
+    "url": "https://app.tervory.com",
+    "cleartext": false
+  },
+  "backgroundColor": "#001840",
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  }
+}
