@@ -13,3 +13,4 @@ ios/App/build/
 *.mobileprovision
 *.p12
 android/app/google-services.json
+android/app/src/e2e/assets/

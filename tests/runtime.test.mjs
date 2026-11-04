@@ -12,7 +12,7 @@ const bundle = await build({
       builder.onLoad({ filter: /.*/, namespace: 'native-test' }, () => ({ contents: `
         export const registerPlugin = () => globalThis.testShell;
         export const App = { addListener() {} };
-        export const PushNotifications = {};
+        export const PushNotifications = globalThis.testPush ?? {};
       ` }));
     },
   }],
@@ -84,4 +84,29 @@ test('a successful shared draft is acknowledged before opening its chats preview
   assert.equal(result.calls[1].acknowledge.kind, 'share');
   assert.equal(result.calls[1].acknowledge.id, 'share-1');
   assert.deepEqual(result.destinations, ['/chats?draft=draft-123']);
+});
+
+test('a general notification delivered to the fake phone opens its Workspace link', async () => {
+  const listeners = new Map();
+  const destinations = [];
+  let registered;
+  const ready = new Promise(resolve => { registered = resolve; });
+  const context = {
+    URL, setTimeout, clearTimeout,
+    location: { origin: 'https://app.tervory.com', pathname: '/chats', assign(value) { destinations.push(value); } },
+    testShell: { async pending() { return {}; } },
+    testPush: {
+      async addListener(name, handler) { listeners.set(name, handler); },
+      async checkPermissions() { registered(); return { receive: 'denied' }; },
+    },
+    async fetch() { return { ok: true, async json() { return { push_enabled: true }; } }; },
+    document: { getElementById() {}, querySelector() {}, body: {} },
+    MutationObserver: class { observe() {} }, addEventListener() {},
+  };
+  context.window = context;
+  vm.runInNewContext(bundle.outputFiles[0].text, context);
+  await ready;
+  listeners.get('pushNotificationActionPerformed')({ notification: { data: { path: '/radix?finding=proof' } } });
+  listeners.get('pushNotificationActionPerformed')({ notification: { data: { path: 'https://evil.test' } } });
+  assert.deepEqual(destinations, ['/radix?finding=proof', '/chats']);
 });

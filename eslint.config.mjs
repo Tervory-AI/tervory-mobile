@@ -4,5 +4,5 @@ import globals from 'globals';
 export default [
   { ignores: ['android/**', 'ios/**', 'www/native.js', '.tmp/**', 'node_modules/**'] },
   js.configs.recommended,
-  { languageOptions: { globals: { ...globals.node, ...globals.browser } } },
+  { languageOptions: { globals: { ...globals.node, ...globals.browser, __MOBILE_TEST_ORIGIN__: 'readonly' } } },
 ];

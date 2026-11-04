@@ -1,5 +1,5 @@
-export const ORIGIN = 'https://app.tervory.com';
-export const CALLBACK = `${ORIGIN}/mobile/callback`;
+export const ORIGIN = typeof __MOBILE_TEST_ORIGIN__ === 'string' ? __MOBILE_TEST_ORIGIN__ : 'https://app.tervory.com';
+export const CALLBACK = 'https://app.tervory.com/mobile/callback';
 
 export function trustedURL(value) {
   try {
@@ -25,6 +25,6 @@ export function notificationPath(value) {
   } catch {
     return '/chats';
   }
-  return url && (url.pathname === '/chats' || url.pathname.startsWith('/chats/'))
-    ? `${url.pathname}${url.search}` : '/chats';
+  return url
+    ? `${url.pathname}${url.search}${url.hash}` : '/chats';
 }

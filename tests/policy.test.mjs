@@ -20,9 +20,10 @@ test('sign-in exchanges a code and PKCE proof, with a fixed return URI', () => {
   assert.throws(() => sessionBody('a'.repeat(32), 'short'));
 });
 
-test('notification destinations cannot leave chats or the Workspace', () => {
+test('general notification destinations cannot leave the Workspace', () => {
   assert.equal(notificationPath('/chats/123'), '/chats/123');
   assert.equal(notificationPath('https://evil.test/chats'), '/chats');
   assert.equal(notificationPath('//evil.test'), '/chats');
-  assert.equal(notificationPath('/admin'), '/chats');
+  assert.equal(notificationPath('/admin'), '/admin');
+  assert.equal(notificationPath('/alerts?filter=ready#proof'), '/alerts?filter=ready#proof');
 });

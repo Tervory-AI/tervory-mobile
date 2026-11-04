@@ -19,7 +19,7 @@ import java.util.ArrayList;
 import java.util.UUID;
 
 final class ShareInbox {
-    private static final int LIMIT = 10 * 1024 * 1024;
+    private static final int LIMIT = 5 * 1024 * 1024;
 
     private static AtomicFile store(Context context) {
         return new AtomicFile(new File(context.getNoBackupFilesDir(), "share-inbox.json"));

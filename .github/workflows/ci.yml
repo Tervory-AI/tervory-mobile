@@ -70,25 +70,26 @@ jobs:
           distribution: temurin
           java-version: '21'
       - run: npm ci && npm run sync
+      - run: node scripts/build-e2e.mjs
       - name: Optional Firebase client configuration
         env:
           MOBILE_FIREBASE_GOOGLE_SERVICES_JSON: ${{ secrets.MOBILE_FIREBASE_GOOGLE_SERVICES_JSON }}
         run: node scripts/firebase-config.mjs
       - name: Install SDK
-        run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0' 'platform-tools'
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;35.0.0" "platform-tools"'
       - name: Build unsigned bundle and emulator APKs
         working-directory: android
-        run: ./gradlew --no-daemon :app:lintDebug :app:bundleRelease :app:assembleDebug :app:assembleDebugAndroidTest
+        run: ./gradlew --no-daemon :app:lintDebug :app:bundleRelease :app:assembleDebug :app:assembleE2e :app:assembleE2eAndroidTest
       - name: Enable KVM for the runner user
         run: sudo setfacl -m "u:$(id -un):rw" /dev/kvm
-      - name: Emulator link and share policy tests (not sign-in acceptance)
+      - name: Emulator Trigger sign-in, notification, link and share tests
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
         with:
           api-level: 35
           arch: x86_64
           target: google_apis
           disable-animations: true
-          script: cd android && ./gradlew --no-daemon :app:connectedDebugAndroidTest
+          script: bash scripts/android-e2e.sh
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: success()
         with:
@@ -103,6 +104,7 @@ jobs:
           path: |
             android/app/build/reports/
             android/app/build/outputs/androidTest-results/
+            .tmp/emulator/
           if-no-files-found: ignore
           retention-days: 14
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9

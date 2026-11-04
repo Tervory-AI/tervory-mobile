@@ -591,8 +591,8 @@
   var PushNotifications = registerPlugin("PushNotifications", {});
 
   // src/policy.mjs
-  var ORIGIN = "https://app.tervory.com";
-  var CALLBACK = `${ORIGIN}/mobile/callback`;
+  var ORIGIN = true ? "https://app.tervory.com" : "https://app.tervory.com";
+  var CALLBACK = "https://app.tervory.com/mobile/callback";
   function trustedURL(value) {
     try {
       const url = new URL(value);
@@ -614,11 +614,11 @@
     } catch {
       return "/chats";
     }
-    return url && (url.pathname === "/chats" || url.pathname.startsWith("/chats/")) ? `${url.pathname}${url.search}` : "/chats";
+    return url ? `${url.pathname}${url.search}${url.hash}` : "/chats";
   }
 
   // src/share.mjs
-  var MAX_SHARE_BYTES = 10 * 1024 * 1024;
+  var MAX_SHARE_BYTES = 5 * 1024 * 1024;
   function shareForm(share) {
     if (!share || typeof share.id !== "string" || !/^[A-Za-z0-9-]{1,80}$/.test(share.id)) {
       throw new Error("The shared item could not be read. Please share it again.");
@@ -627,17 +627,17 @@
     form.append("share_id", share.id);
     const text = typeof share.text === "string" ? share.text : "";
     let size = new TextEncoder().encode(text).length;
-    if (size > MAX_SHARE_BYTES) throw new Error("Share files up to 10 MB at a time.");
+    if (size > MAX_SHARE_BYTES) throw new Error("Share files up to 5 MB at a time.");
     form.append("text", text);
     const files = share.files ?? [];
     if (!Array.isArray(files) || files.length > 5) throw new Error("Share up to five files at a time.");
     for (const file of files) {
       if (typeof file.data !== "string" || file.data.length > Math.ceil(MAX_SHARE_BYTES / 3) * 4) {
-        throw new Error("Share files up to 10 MB at a time.");
+        throw new Error("Share files up to 5 MB at a time.");
       }
       const binary = atob(file.data);
       size += binary.length;
-      if (size > MAX_SHARE_BYTES) throw new Error("Share files up to 10 MB at a time.");
+      if (size > MAX_SHARE_BYTES) throw new Error("Share files up to 5 MB at a time.");
       const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
       const name = typeof file.name === "string" ? Array.from(
         file.name,

@@ -15,13 +15,13 @@ public class LinkPolicyTest {
         assertFalse(MobileShell.isWorkspace(Uri.parse("https://app.tervory.com.evil.test")));
         assertFalse(MobileShell.isWorkspace(Uri.parse("https://user@app.tervory.com")));
         assertFalse(MobileShell.isWorkspace(Uri.parse("https://app.tervory.com:8443")));
-        assertTrue(MobileShell.isWorkspace(Uri.parse("https://app.tervory.com/chats")));
+        assertTrue(MobileShell.isWorkspace(Uri.parse(MobileShell.ORIGIN + "/chats")));
     }
 
     @Test
     public void signInStaysOutOfWebView() {
-        assertTrue(MobileShell.isSignIn(Uri.parse("https://app.tervory.com/sign-in")));
-        assertTrue(MobileShell.isSignIn(Uri.parse("https://app.tervory.com/sign-in/continue")));
-        assertFalse(MobileShell.isSignIn(Uri.parse("https://app.tervory.com/chats")));
+        assertTrue(MobileShell.isSignIn(Uri.parse(MobileShell.ORIGIN + "/sign-in")));
+        assertTrue(MobileShell.isSignIn(Uri.parse(MobileShell.ORIGIN + "/sign-in/continue")));
+        assertFalse(MobileShell.isSignIn(Uri.parse(MobileShell.ORIGIN + "/chats")));
     }
 }

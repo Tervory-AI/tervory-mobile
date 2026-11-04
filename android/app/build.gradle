@@ -4,6 +4,8 @@ def mobilePackage = new groovy.json.JsonSlurper().parse(file('../../package.json
 
 android {
     namespace = "com.tervory.app"
+    buildFeatures { buildConfig true }
+    testBuildType "e2e"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
         applicationId "com.tervory.app"
@@ -12,6 +14,7 @@ android {
         versionCode 1
         versionName mobilePackage.version
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField "boolean", "MOBILE_E2E", "false"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
@@ -19,6 +22,11 @@ android {
         }
     }
     buildTypes {
+        e2e {
+            initWith debug
+            matchingFallbacks = ['debug']
+            buildConfigField "boolean", "MOBILE_E2E", "true"
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
@@ -42,6 +50,7 @@ dependencies {
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    androidTestImplementation 'androidx.test.uiautomator:uiautomator:2.3.0'
     implementation project(':capacitor-cordova-android-plugins')
 }
 

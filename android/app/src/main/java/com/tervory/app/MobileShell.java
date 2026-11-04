@@ -19,9 +19,17 @@ public class MobileShell extends Plugin {
     private String verifier;
     private long started;
     private JSObject auth;
-    static final String ORIGIN = "https://app.tervory.com";
+    static final String ORIGIN = BuildConfig.MOBILE_E2E ? "http://127.0.0.1:4100" : "https://app.tervory.com";
 
     static boolean isWorkspace(Uri url) {
+        if (BuildConfig.MOBILE_E2E) {
+            return url != null && "http".equals(url.getScheme()) && "127.0.0.1".equals(url.getHost())
+                && url.getPort() == 4100 && url.getUserInfo() == null;
+        }
+        return isCallbackOrigin(url);
+    }
+
+    static boolean isCallbackOrigin(Uri url) {
         return url != null && "https".equals(url.getScheme())
             && "app.tervory.com".equals(url.getHost()) && url.getUserInfo() == null
             && (url.getPort() == -1 || url.getPort() == 443);
@@ -55,7 +63,7 @@ public class MobileShell extends Plugin {
                 MessageDigest.getInstance("SHA-256").digest(verifier.getBytes(StandardCharsets.US_ASCII)),
                 Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
             Uri url = Uri.parse(ORIGIN + "/mobile/sign-in").buildUpon()
-                .appendQueryParameter("redirect_uri", ORIGIN + "/mobile/callback")
+                .appendQueryParameter("redirect_uri", "https://app.tervory.com/mobile/callback")
                 .appendQueryParameter("state", state)
                 .appendQueryParameter("code_challenge", challenge)
                 .appendQueryParameter("code_challenge_method", "S256").build();
@@ -71,7 +79,7 @@ public class MobileShell extends Plugin {
     }
 
     void receiveLink(Uri url) {
-        if (!isWorkspace(url) || !"/mobile/callback".equals(url.getPath()) || url.getFragment() != null) return;
+        if (!isCallbackOrigin(url) || !"/mobile/callback".equals(url.getPath()) || url.getFragment() != null) return;
         String code = url.getQueryParameter("code");
         String returnedState = url.getQueryParameter("state");
         if (state == null || verifier == null || returnedState == null

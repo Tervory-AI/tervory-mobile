@@ -65,7 +65,7 @@ public class MainActivity extends BridgeActivity {
                     runOnUiThread(() -> bridge.getWebView().loadUrl(MobileShell.ORIGIN + "/chats"));
                 } catch (Exception error) {
                     runOnUiThread(() -> new android.app.AlertDialog.Builder(this)
-                        .setMessage("Share up to five files totaling 10 MB. Please try sharing again.")
+                        .setMessage("Share up to five files totaling 5 MB. Please try sharing again.")
                         .setPositiveButton("OK", null).show());
                 }
             }, "tervory-share").start();

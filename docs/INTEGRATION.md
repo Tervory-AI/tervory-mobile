@@ -6,9 +6,8 @@ secret. All on-screen sign-in wording is **Trigger sign-in**.
 
 ## Sign-in (Workspace owner)
 
-These are required endpoints, **not existing verified services**. The initial
-tervory-tank main checkout still used the old identity integration. The Workspace
-owner must implement and deploy this contract before real sign-in acceptance.
+The companion `tervory-tank` branch `codex/mobile-apps` implements these endpoints.
+They still require review and deployment before production sign-in acceptance.
 
 1. Public GET `/mobile/sign-in` receives `state`, `code_challenge`,
    `code_challenge_method=S256`, and the exact `redirect_uri`
@@ -24,7 +23,7 @@ owner must implement and deploy this contract before real sign-in acceptance.
    `redirect_uri`. Check Origin, the exact URI, expiry, one-time consumption,
    and SHA-256 PKCE proof. Set the existing Workspace HttpOnly, Secure,
    SameSite session cookie, scoped to the authenticated user and tenant.
-   Return 204; use Cache-Control: no-store. Do not accept a tenant from the app.
+   Return 200; use Cache-Control: no-store. Do not accept a tenant from the app.
 5. Native code validates the exact HTTPS callback host/path, state, code shape,
    and five-minute lifetime; it forgets the state on consumption. The WebView
    exchanges the code and then opens `/chats`. Browser cookies are never copied.
@@ -36,7 +35,7 @@ owner must implement and deploy this contract before real sign-in acceptance.
 Serve both documents publicly without authentication or redirects:
 
 - `/.well-known/apple-app-site-association`: appID
-  `APPLE_TEAM_ID.com.tervory.app`, components matching `/mobile/callback` only.
+  `MOBILE_APPLE_TEAM_ID.com.tervory.app`, components matching `/mobile/callback` only.
 - `/.well-known/assetlinks.json`: relation `delegate_permission/common.handle_all_urls`,
   namespace `android_app`, package_name `com.tervory.app`, and the real Android
   signing certificate SHA-256 fingerprints. Never publish placeholder fingerprints.
@@ -47,10 +46,15 @@ builds cannot prove universal links on a physical iOS device.
 
 ## Acceptance
 
-The release is not complete until CI builds both platforms and an Android
-emulator authenticates through Trigger in its browser, follows the verified
-callback, and opens the authenticated `/chats` page. A URL-routing or mock-server
-test alone is not sign-in acceptance. Record the build URL and emulator evidence.
+CI uses an isolated `e2e` Android build, loopback-only fake Workspace and real system
+Chrome. It exercises Trigger sign-in, one-use PKCE exchange, the HTTPS app callback,
+an HttpOnly WebView session and authenticated `/chats`. It registers a fake phone
+through the real push-plugin listener, calls fake notify and delivers the returned
+payload through the native notification-tap intent, verifying its link opens.
+This proves the requested fake-backed flow, not live Trigger or APNs/FCM delivery.
+Release builds always use the fixed HTTPS production origin; only the e2e source
+set contains the cleartext config. CI explicitly approves the callback association
+for that test; production verification still requires real signing fingerprints.
 
 After deploying the contract, install the debug APK in an Android emulator, verify
 the host's app association with its actual debug certificate, and run
@@ -64,8 +68,8 @@ of a passed production sign-in test. No test credentials are bundled.
 
 ## Push delivery (Workspace/Tank owner)
 
-These endpoints also require implementation; the mobile repository cannot wire
-the existing product delivery workers by itself.
+Tank exposes one general channel. No product-specific subscriptions or emitters
+are added. The companion backend branch supplies the Workspace endpoints below.
 
 - Authenticated GET `/api/mobile/bootstrap` returns `{ "push_enabled": true }`
   only once native delivery is configured for that user. Otherwise return false.
@@ -76,33 +80,34 @@ the existing product delivery workers by itself.
   and rotate registrations without duplicating deliveries. Unlink registrations
   on sign-out, session revocation and account/tenant removal. Tokens are personal
   data; never log them. Only permit one active user/tenant binding per token.
-- Fan out the alerts already emitted by Tiger, Radix, Autumbra, Market Lab and
-  the morning report through APNs/FCM alongside existing delivery. Reuse the
-  existing event IDs for deduplication, user preferences and authorization.
-  Delete invalid/revoked tokens, retry transient failures with a bound, and do
-  not include private alert bodies in lock-screen text by default.
-- Send notification payloads, not data-only background messages. Use generic
-  title/body and optional `data.path` restricted to `/chats` or its descendants.
-  Native notification taps always return to chats; payloads cannot open external
-  sites. APNs and FCM credentials stay on the server.
+- Any product may call `POST /v1/mobile/notify` with its existing Tank key and
+  `{tenant_id, user_id?, title, body, link}`. Omit user_id to address the tenant.
+  Tank's Python `notify` function provides the same channel. Each call fans out
+  to every active matching phone, returns sent/dead/failed/unavailable counts,
+  and removes provider-confirmed dead tokens. Callers own retry policy;
+  repeating successful calls can duplicate notifications.
+- APNs and FCM receive title/body notification payloads and `path` data.
+  Notification taps open any same-origin Workspace link, never an external site.
+  Senders choose lock-screen-safe text. Credentials remain server-side.
 
 ## Share drafts (Workspace owner)
 
 Authenticated multipart POST `/api/mobile/shares` receives `share_id`, `text`,
-and up to five binary `files` with a combined 10 MiB limit. Verify Origin and
+and up to five binary `files` with a combined 5 MiB limit. Verify Origin and
 session, derive the tenant, sanitize filenames, validate file sizes/types on the
-server, scan/quarantine attachments, and store an **unsent chat draft**. Never
+server, store binary files as inert attachments, and create an **unsent chat draft**. Never
 execute shared content, automatically fetch a URL or send a message. Deduplicate
 `share_id` per user/tenant so retries return the same `{ "draft_id": "…" }`.
 The existing `/chats?draft=…` UI must load only that user's tenant-scoped draft
 and let the user review it before sending. Return 401 while signed out.
 
-Android SEND/SEND_MULTIPLE opens `/chats` immediately. iOS uses a Share extension
-and a protected App Group inbox; the next containing-app activation opens chats.
-The user sees “Saved. Open Tervory to continue in chats.” Apple does not support
-launching the containing app from its Share extension via NSExtensionContext.open:
-https://developer.apple.com/documentation/foundation/nsextensioncontext/open(_:completionhandler:)
-Immediate app launch from an iOS share sheet is therefore not claimed here.
+Android SEND/SEND_MULTIPLE opens `/chats` immediately. iOS writes a protected App
+Group inbox atomically, then calls the public `UIScene.open` API with a nonce-only
+`tervory://share/<id>` handoff. Cold and warm app URL handlers verify that nonce
+against the private inbox before opening `/chats`. No file content or sign-in
+proof travels through the custom scheme. Failure to open offers a retry button.
+The unsigned archive checks compilation; signed-device testing is still needed
+to verify the host share-sheet transition and App Group entitlement at runtime.
 Both platforms retain the last pending share locally for at most 24 hours and
 delete it after successful draft creation. Unsigned iOS builds cannot exercise
 App Group sharing on a physical device. Signing must enable the App Group for

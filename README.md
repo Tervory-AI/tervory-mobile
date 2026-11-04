@@ -4,7 +4,7 @@ Capacitor iOS and Android apps loading the existing Workspace at
 https://app.tervory.com. Trigger sign-in opens in the system browser and returns
 through a verified app link. The apps contain no password field.
 
-Native push notifications deliver existing product alerts. Sharing a link or file
+Native push notifications use one general Tank channel. Sharing a link or file
 from another app opens Tervory chats at `/chats`.
 
 Android and unsigned iOS build artifacts are produced for `mobile-v*` tags.
@@ -49,17 +49,17 @@ and have the release owner push the matching `mobile-v<version>` tag after revie
 
 Read [the Workspace contract](docs/INTEGRATION.md) before testing sign-in, push or
 chat drafts. These features need authenticated Workspace endpoints and existing
-alert-worker delivery integration in the application repository. This repository
+general notification delivery in the application repository. This repository
 does not claim those endpoints are already deployed. Sign-in uses the system
 browser; session cookies are issued by the Workspace, never copied from a browser.
 Configure verified app links with real signing fingerprints and an Apple team ID.
 
-Android sharing opens chats immediately. The iOS Share extension saves locally
-and opens chats when the user next opens Tervory; iOS does not support automatic
-containing-app launch from this extension point. Pending shares expire after
+Android sharing opens chats immediately. The iOS Share extension saves to its
+App Group and requests an immediate nonce-only app handoff using `UIScene.open`.
+Signed-device verification is still required for that transition. Pending shares expire after
 24 hours. Files become unsent drafts and are never automatically sent to a model.
 
 Paid store/signing accounts and server push settings are listed by name in
 [FOUNDER-SETTINGS.md](docs/ops/FOUNDER-SETTINGS.md). Unsigned builds need none of
 those signing credentials. Live Trigger sign-in and authenticated `/chats` on an
-emulator remain a release acceptance requirement, distinct from CI routing tests.
+emulator remain production checks, distinct from the fake-backed CI sign-in flow.
