@@ -1,0 +1,10 @@
+{
+  "appId": "com.tervory.app",
+  "appName": "Tervory",
+  "webDir": "www",
+  "server": {
+    "url": "https://app.tervory.com",
+    "cleartext": false
+  },
+  "backgroundColor": "#001840"
+}
