@@ -44,7 +44,6 @@ public class MainActivity extends BridgeActivity {
                 }
             }
         });
-        handleIntent(getIntent());
     }
 
     @Override
@@ -55,6 +54,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void handleIntent(Intent intent) {
+        if (bridge == null) return;
         if (intent != null && Intent.ACTION_VIEW.equals(intent.getAction())) {
             ((MobileShell) bridge.getPlugin("MobileShell").getInstance()).receiveLink(intent.getData());
         }
