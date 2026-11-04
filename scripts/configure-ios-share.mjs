@@ -26,4 +26,12 @@ for (const [key, value] of Object.entries({
     project.updateBuildProperty(key, value, undefined, '"ShareExtension"');
   }
   project.updateBuildProperty('MARKETING_VERSION', '0.1.0', undefined, 'App');
+function clean(value) {
+  if (!value || typeof value !== 'object') return;
+  for (const key of Object.keys(value)) {
+    if (value[key] === undefined || value[key] === 'undefined') delete value[key];
+    else clean(value[key]);
+  }
+}
+clean(project.hash);
 await writeFile(path, project.writeSync());

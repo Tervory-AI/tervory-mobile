@@ -37,11 +37,32 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 class MobileViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         bridge?.registerPluginInstance(MobileShell())
+        if let handler = webView?.navigationDelegate as? WKScriptMessageHandler,
+           let controller = webView?.configuration.userContentController {
+            controller.removeScriptMessageHandler(forName: "bridge")
+            controller.add(TrustedBridgeHandler(forward: handler), name: "bridge")
+        }
         if let url = Bundle.main.url(forResource: "native", withExtension: "js", subdirectory: "public"),
            let script = try? String(contentsOf: url, encoding: .utf8) {
             webView?.configuration.userContentController.addUserScript(
                 WKUserScript(source: script, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
         }
+    }
+}
+
+class TrustedBridgeHandler: NSObject, WKScriptMessageHandler {
+    private let forward: WKScriptMessageHandler
+
+    init(forward: WKScriptMessageHandler) {
+        self.forward = forward
+        super.init()
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        let origin = message.frameInfo.securityOrigin
+        guard message.frameInfo.isMainFrame, origin.protocol == "https",
+              origin.host == "app.tervory.com", origin.port == 0 || origin.port == 443 else { return }
+        forward.userContentController(userContentController, didReceive: message)
     }
 }
 

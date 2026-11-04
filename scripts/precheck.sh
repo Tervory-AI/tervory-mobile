@@ -16,13 +16,19 @@ fi
 if [ -f package-lock.json ]; then
   npm run lint
   npm test
-  npm audit --omit=dev --audit-level=high
+  npm audit --audit-level=low
 fi
 folder=$(basename "$PWD")
-docker run --rm --label tervory.test=1 --name "${folder}-semgrep-$$" \
+container=$(docker run --detach --rm --label tervory.test=1 --name "${folder}-semgrep-$$" \
   --volume "$PWD:/src" --workdir /src --entrypoint semgrep \
   semgrep/semgrep:1.182.1@sha256:c8f333ab0ad103d2bcd3b55cbeabcfc556bfeaa7446ba18594a4320f3807ffc9 \
-  scan --config p/default --json --metrics=off --disable-version-check \
-  --output /src/.tmp/semgrep.json
+  scan --config p/default --json --metrics=off --disable-version-check --timeout 120 \
+  --output /src/.tmp/semgrep.json)
+status=$(docker wait "$container")
+if [ "$status" != 0 ]; then
+  docker logs "$container" || true
+  echo "Semgrep exited with status $status"
+  exit 1
+fi
 node scripts/check-semgrep.mjs .tmp/semgrep.json
 git diff --check

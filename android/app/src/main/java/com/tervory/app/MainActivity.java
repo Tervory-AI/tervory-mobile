@@ -13,6 +13,12 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(MobileShell.class);
         super.onCreate(savedInstanceState);
+        if (!androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            bridge.getWebView().removeJavascriptInterface("androidBridge");
+            android.widget.Toast.makeText(this, "Update Android System WebView to open Tervory.", android.widget.Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
         bridge.setWebViewClient(new BridgeWebViewClient(bridge) {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {

@@ -52,6 +52,16 @@ emulator authenticates through Trigger in its browser, follows the verified
 callback, and opens the authenticated `/chats` page. A URL-routing or mock-server
 test alone is not sign-in acceptance. Record the build URL and emulator evidence.
 
+After deploying the contract, install the debug APK in an Android emulator, verify
+the host's app association with its actual debug certificate, and run
+`npm run acceptance -- --serial emulator-5554`. Complete Trigger sign-in in the
+emulator's system browser. The harness waits five minutes, attaches only to the
+app's debug WebView, verifies `/chats`, no password input and authenticated
+bootstrap HTTP 200, and saves local JSON/screenshot evidence under `.tmp/acceptance`.
+It deliberately fails if the session is missing. This is an operator-assisted
+acceptance harness; it is not a claim of automated browser credential entry or
+of a passed production sign-in test. No test credentials are bundled.
+
 ## Push delivery (Workspace/Tank owner)
 
 These endpoints also require implementation; the mobile repository cannot wire
